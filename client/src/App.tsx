@@ -20,6 +20,7 @@ export default function App() {
   const ttsWsRef = useRef<WebSocket | null>(null);
   const audioRef = useRef<Awaited<ReturnType<typeof createAudioPipelines>> | null>(null);
   const textBufferRef = useRef<string>("");
+  const ttsQueueRef = useRef<string[]>([]);
 
   const log = (l: Omit<Log, "ts">) => setLogs((s) => [...s, { ...l, ts: Date.now() }]);
 
@@ -30,6 +31,10 @@ export default function App() {
   async function connect() {
     try {
       if (!audioRef.current) audioRef.current = await createAudioPipelines();
+      if (audioRef.current?.ctx.state !== "running") {
+        await audioRef.current?.ctx.resume();
+        log({ level: "info", msg: "audio_context_resumed" });
+      }
 
       const tokenRes = await fetch(`${SERVER_BASE}/session`);
       const data = await tokenRes.json();
@@ -125,17 +130,36 @@ export default function App() {
       ttsWs.onopen = () => {
         setTtsOpen(true);
         try {
+          while (ttsQueueRef.current.length) {
+            const next = ttsQueueRef.current.shift()!;
+            ttsWs.send(JSON.stringify({ type: "speak", text: next, voiceId: ELEVEN_VOICE_ID }));
+            log({ level: "info", msg: "tts_speak_sent_from_queue", data: next.slice(0, 60) });
+          }
           ttsWs.send(JSON.stringify({ type: "speak", text: PROACTIVE_GREETING_HI, voiceId: ELEVEN_VOICE_ID }));
           log({ level: "info", msg: "tts_proactive_sent" });
         } catch (e) {
           log({ level: "error", msg: "tts_proactive_error", data: String(e) });
         }
       };
-      ttsWs.onclose = () => setTtsOpen(false);
+      ttsWs.onerror = (ev) => {
+        log({ level: "error", msg: "tts_ws_error", data: String(ev) });
+      };
+      ttsWs.onclose = () => {
+        setTtsOpen(false);
+        log({ level: "error", msg: "tts_ws_closed" });
+      };
       ttsWs.onmessage = (e) => {
         if (typeof e.data !== "string" && e.data instanceof ArrayBuffer) {
+          log({ level: "info", msg: "tts_chunk_recv", data: (e.data.byteLength || 0) });
           audioRef.current?.pushPcm16(e.data);
+          return;
         }
+        try {
+          const msg = JSON.parse(e.data as string);
+          if (msg.type === "eof") {
+            audioRef.current?.clearPlayer();
+          }
+        } catch {}
       };
 
       if (stream) {
@@ -217,9 +241,14 @@ export default function App() {
       } else if (msg.type === "response.completed" || msg.type === "response.done") {
         const text = textBufferRef.current.trim();
         textBufferRef.current = "";
-        if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
-          ttsWsRef.current.send(JSON.stringify({ type: "speak", text }));
-          log({ level: "info", msg: "tts_speak_sent", data: text.slice(0, 60) });
+        if (text) {
+          if (ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
+            ttsWsRef.current.send(JSON.stringify({ type: "speak", text, voiceId: ELEVEN_VOICE_ID }));
+            log({ level: "info", msg: "tts_speak_sent", data: text.slice(0, 60) });
+          } else {
+            ttsQueueRef.current.push(text);
+            log({ level: "info", msg: "tts_queue_deferred", data: text.slice(0, 60) });
+          }
         }
       }
       log({ level: "info", msg: "oai", data: msg.type });
