@@ -17,6 +17,15 @@ Browser (React)
 - Barge‑in: simple VAD using analyser energy; cancels TTS instantly
 
 Server (Express + ws)
+## Interview Agent (Hindi - Shreya)
+- Persona configured in server /session instructions. The agent speaks strictly in Hindi and follows a 3-minute recruiter flow as "Shreya" from Talent Hub (Navi Mumbai), with the provided steps and guardrails.
+- TTS uses ElevenLabs multilingual_v2 with default voice ID 1Z7Y8o9cvUeWq8oLKgMY. Override via env ELEVENLABS_VOICE_ID or per-message voiceId.
+
+Quick test:
+- Server: npm run dev
+- Client: npm run dev
+- Connect and speak/type in Hindi; responses should be in Hindi. Barge-in should cancel playback immediately when you speak.
+- TTS script: npm run test:tts (generates WAV with Hindi speech using multilingual_v2).
 - `GET /session` mints ephemeral OpenAI Realtime token
 - Live STT handled by OpenAI Realtime; mic track is sent via WebRTC and server VAD detects turns
 - `WS /ws/tts` bridges text to ElevenLabs TTS streaming and relays PCM16 audio chunks
@@ -39,6 +48,7 @@ cp server/.env.example server/.env
 # Edit server/.env with your keys
 OPENAI_API_KEY=sk-...
 ELEVENLABS_API_KEY=...
+ELEVENLABS_VOICE_ID=1Z7Y8o9cvUeWq8oLKgMY
 CLIENT_URL=http://localhost:5173
 PORT=8080
 ```

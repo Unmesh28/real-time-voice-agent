@@ -44,7 +44,8 @@ async function main() {
     };
     ws.on("open", () => {
       console.log("TTS WS open");
-      ws.send(JSON.stringify({ type: "speak", text: "Hello, this is a realtime TTS test from ElevenLabs via our bridge.", voiceId: process.env.ELEVEN_VOICE_ID }));
+      const hindiText = "नमस्ते! यह एक रियल-टाइम हिंदी टीटीएस परीक्षण है। हम इंटरव्यू एजेंट के लिए बहुभाषी आवाज़ का उपयोग कर रहे हैं।";
+      ws.send(JSON.stringify({ type: "speak", text: hindiText, voiceId: process.env.ELEVENLABS_VOICE_ID }));
       arm();
     });
     ws.on("message", (data) => {
