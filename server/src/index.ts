@@ -31,10 +31,16 @@ app.get("/session", async (_req, res) => {
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
+        "OpenAI-Beta": "realtime=v1",
       },
       body: JSON.stringify({
         model: "gpt-4o-realtime-preview-2025-06-03",
         voice: "verse",
+        turn_detection: { type: "server_vad" },
+        input_audio_format: "pcm16",
+        input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
+        modalities: ["text", "audio"],
+        instructions: "You are a helpful, concise voice assistant. Keep responses brief and conversational.",
       }),
     });
     const data = await r.json();

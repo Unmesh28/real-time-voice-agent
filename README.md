@@ -2,7 +2,7 @@
 
 Voice agent that uses:
 - OpenAI Realtime (WebRTC) for low‑latency LLM conversation
-- ElevenLabs Scribe (WebSocket) for speech‑to‑text (STT)
+- OpenAI Realtime STT (WebRTC, server VAD + transcription)
 - ElevenLabs TTS (WebSocket Streaming) for speech output
 - Barge‑in: TTS playback cancels immediately when user starts speaking
 - Structured logging via `pino`
@@ -19,7 +19,7 @@ Browser (React)
 
 Server (Express + ws)
 - `GET /session` mints ephemeral OpenAI Realtime token
-- `WS /ws/stt` bridges PCM16 frames to ElevenLabs Scribe; relays partial/final transcripts
+- Live STT handled by OpenAI Realtime; mic track is sent via WebRTC and server VAD detects turns
 - `WS /ws/tts` bridges text to ElevenLabs TTS streaming and relays PCM16 audio chunks
 - CORS enabled for local client
 
@@ -71,8 +71,8 @@ npm run dev
 - If a microphone is not available, use the text input to send prompts.
 
 Watch logs for:
-- "stt" partial/final
-- "user_to_llm"
+- "oai" response.delta/response.completed
+- "user_to_llm" (for text fallback)
 - "oai" events
 - "barge_in" when TTS is interrupted
 

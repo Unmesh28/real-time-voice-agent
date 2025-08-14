@@ -46,10 +46,8 @@ export default function App() {
       };
 
       let stream: MediaStream | null = null;
-      let downsampler: any = null;
       try {
         const mic = await audioRef.current.getMicNode();
-        downsampler = mic.downsampler;
         stream = mic.stream;
         stream.getTracks().forEach((t) => pc.addTrack(t));
       } catch (err) {
@@ -64,28 +62,6 @@ export default function App() {
         }
       };
 
-      if (downsampler) {
-        downsampler.port.onmessage = (e: MessageEvent) => {
-          const ws = sttWsRef.current;
-          if (ws && ws.readyState === WebSocket.OPEN && e.data instanceof ArrayBuffer) {
-            ws.send(e.data);
-          }
-        };
-      }
-
-      if (stream) {
-        const sttWs = new WebSocket(SERVER_BASE.replace("http", "ws") + "/ws/stt");
-        sttWsRef.current = sttWs;
-        sttWs.onmessage = (e) => {
-          try {
-            const msg = JSON.parse(e.data);
-            if (msg.type === "final") {
-              sendUserTextToLLM(msg.text);
-            }
-            log({ level: "info", msg: "stt", data: msg });
-          } catch {}
-        };
-      }
 
       const ttsWs = new WebSocket(SERVER_BASE.replace("http", "ws") + "/ws/tts");
       ttsWsRef.current = ttsWs;
@@ -105,6 +81,8 @@ export default function App() {
       if (!stream) {
         pc.addTransceiver("audio", { direction: "recvonly" });
         log({ level: "info", msg: "added_recvonly_audio_transceiver" });
+      } else {
+        log({ level: "info", msg: "mic_track_added_to_openai" });
       }
 
       const offer = await pc.createOffer();
@@ -132,6 +110,8 @@ export default function App() {
 
       if (stream) {
         setupBargeIn(stream);
+      } else {
+        log({ level: "info", msg: "using_text_fallback" });
       }
 
       setConnected(true);
