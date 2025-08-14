@@ -211,9 +211,9 @@ export default function App() {
   function handleOaiEvent(e: MessageEvent) {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === "response.delta" && msg.delta) {
+      if (msg.type === "response.audio_transcript.delta" && msg.delta) {
         textBufferRef.current += msg.delta;
-      } else if (msg.type === "response.completed" || msg.type === "response.done") {
+      } else if (msg.type === "response.audio_transcript.done") {
         const text = textBufferRef.current.trim();
         textBufferRef.current = "";
         if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
