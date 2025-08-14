@@ -8,6 +8,7 @@ type Log = { ts: number; level: "info" | "error"; msg: string; data?: any };
 export default function App() {
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [ttsOpen, setTtsOpen] = useState(false);
   const [noMic, setNoMic] = useState(false);
@@ -131,9 +132,17 @@ export default function App() {
       ttsWs.onopen = () => setTtsOpen(true);
       ttsWs.onclose = () => setTtsOpen(false);
       ttsWs.onmessage = (e) => {
-        if (typeof e.data !== "string" && e.data instanceof ArrayBuffer) {
-          audioRef.current?.pushPcm16(e.data);
-        }
+        try {
+          if (typeof e.data === "string") {
+            const msg = JSON.parse(e.data);
+            if (msg.type === "eof") {
+              setAgentSpeaking(false);
+            }
+          } else if (e.data instanceof ArrayBuffer) {
+            if (!agentSpeaking) setAgentSpeaking(true);
+            audioRef.current?.pushPcm16(e.data);
+          }
+        } catch {}
       };
 
       if (!stream) {
@@ -188,20 +197,27 @@ export default function App() {
     const data = new Uint8Array(analyser.frequencyBinCount);
     let speakingLocal = false;
     const tick = () => {
-      analyser.getByteFrequencyData(data);
-      const avg = data.reduce((a, b) => a + b, 0) / data.length;
-      const isSpeaking = avg > 12;
-      if (isSpeaking && !speakingLocal) {
-        speakingLocal = true;
-        setSpeaking(true);
-        audioRef.current?.clearPlayer();
-        if (ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
-          ttsWsRef.current.send(JSON.stringify({ type: "cancel" }));
+      if (agentSpeaking) {
+        if (speakingLocal) {
+          speakingLocal = false;
+          setSpeaking(false);
         }
-        log({ level: "info", msg: "barge_in" });
-      } else if (!isSpeaking && speakingLocal) {
-        speakingLocal = false;
-        setSpeaking(false);
+      } else {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        const isSpeaking = avg > 12;
+        if (isSpeaking && !speakingLocal) {
+          speakingLocal = true;
+          setSpeaking(true);
+          audioRef.current?.clearPlayer();
+          if (ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
+            ttsWsRef.current.send(JSON.stringify({ type: "cancel" }));
+          }
+          log({ level: "info", msg: "barge_in" });
+        } else if (!isSpeaking && speakingLocal) {
+          speakingLocal = false;
+          setSpeaking(false);
+        }
       }
       requestAnimationFrame(tick);
     };
