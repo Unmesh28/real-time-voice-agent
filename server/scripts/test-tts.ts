@@ -2,6 +2,31 @@ import WebSocket from "ws";
 import fs from "fs";
 import path from "path";
 
+function writeWavPCM16Mono(filePath: string, samples: Buffer, sampleRate = 16000) {
+  const numChannels = 1;
+  const bytesPerSample = 2;
+  const byteRate = sampleRate * numChannels * bytesPerSample;
+  const blockAlign = numChannels * bytesPerSample;
+  const dataSize = samples.length;
+  const fmtChunkSize = 16;
+  const fileSize = 4 + (8 + fmtChunkSize) + (8 + dataSize);
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(fileSize, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(fmtChunkSize, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(dataSize, 40);
+  fs.writeFileSync(filePath, Buffer.concat([header, samples]));
+}
+
 async function main() {
   const base = process.env.BASE_URL || "ws://localhost:8080";
   const outDir = process.env.OUT_DIR || "/home/ubuntu/tmp";
@@ -11,12 +36,7 @@ async function main() {
   await new Promise<void>((resolve, reject) => {
     ws.on("open", () => {
       console.log("TTS WS open");
-      ws.send(JSON.stringify({ type: "speak", text: "Hello, this is a realtime TTS test from ElevenLabs via our bridge." }));
-      setTimeout(() => {
-        try {
-          ws.close();
-        } catch {}
-      }, 12000);
+      ws.send(JSON.stringify({ type: "speak", text: "Hello, this is a realtime TTS test from ElevenLabs via our bridge.", voiceId: process.env.ELEVEN_VOICE_ID }));
     });
     ws.on("message", (data) => {
       if (Buffer.isBuffer(data)) {
@@ -34,10 +54,10 @@ async function main() {
     ws.on("error", (e) => reject(e));
   });
 
-  const buf = Buffer.concat(outChunks);
-  const outFile = path.join(outDir, "tts_test.mp3");
-  fs.writeFileSync(outFile, buf);
-  console.log("Saved TTS MP3 to:", outFile, "bytes:", buf.length);
+  const pcm = Buffer.concat(outChunks);
+  const wavFile = path.join(outDir, "tts_test.wav");
+  writeWavPCM16Mono(wavFile, pcm, 16000);
+  console.log("Saved TTS WAV to:", wavFile, "bytes:", pcm.length);
 }
 main().catch((e) => {
   console.error(e);

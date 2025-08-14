@@ -52,25 +52,42 @@ npm i
 
 4) Start server (dev):
 ```
-npx ts-node src/index.ts
+npm run dev
 ```
 
 5) Client env:
 ```
-cd /home/ubuntu/voice-agent-client
+cd ../client
 cp .env.example .env
-# set API URL of server
-echo "VITE_SERVER_URL=http://localhost:8080" >> .env
+# Ensure API URL of server is set
+# VITE_SERVER_URL is already present in .env.example, but you can override it:
+# echo "VITE_SERVER_URL=http://localhost:8080" >> .env
 npm i
 npm run dev
 ```
 
 6) Open the app at the printed Vite URL (default http://localhost:5173).
-Click "Connect", grant mic access, and start speaking. Watch logs for:
+- Click "Connect". If a microphone is available, grant access and speak.
+- If a microphone is not available, use the text input to send prompts.
+
+Watch logs for:
 - "stt" partial/final
 - "user_to_llm"
 - "oai" events
 - "barge_in" when TTS is interrupted
+
+### Quick test scripts (server)
+Run these with the server running:
+```
+# Validate OpenAI Realtime ephemeral session creation
+npm run test:session
+
+# Validate ElevenLabs TTS streaming bridge (saves /home/ubuntu/tmp/tts_test.wav)
+npm run test:tts
+
+# Validate ElevenLabs Scribe STT bridge
+npm run test:stt
+```
 
 ## Logging
 

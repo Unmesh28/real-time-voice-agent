@@ -161,10 +161,10 @@ wssTts.on("connection", async (clientWs) => {
       } catch (e) {
         logger.warn({ at: "tts.nonjson", text }, "Non-JSON TTS text frame");
       }
-    ttsWs.on("error", (err) => {
-      logger.error({ at: "tts.ws.error", err }, "ElevenLabs TTS WS error");
     });
 
+    ttsWs.on("error", (err) => {
+      logger.error({ at: "tts.ws.error", err }, "ElevenLabs TTS WS error");
     });
 
     ttsWs.on("close", (code, reason) => {
