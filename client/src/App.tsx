@@ -98,6 +98,25 @@ export default function App() {
           log({ level: "error", msg: "proactive_start_error", data: String(e) });
         }
       };
+      setTimeout(() => {
+        try {
+          const proactive = {
+            type: "response.create",
+            response: {
+              modalities: ["text"],
+              instructions:
+                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+            },
+          };
+          const ch = dcRef.current && dcRef.current.readyState === "open" ? dcRef.current : eventsDc;
+          if (ch && ch.readyState === "open") {
+            ch.send(JSON.stringify(proactive));
+            log({ level: "info", msg: "proactive_retry_sent" });
+          }
+        } catch (e) {
+          log({ level: "error", msg: "proactive_retry_error", data: String(e) });
+        }
+      }, 2000);
 
       const ttsWs = new WebSocket(SERVER_BASE.replace("http", "ws") + "/ws/tts");
       ttsWsRef.current = ttsWs;

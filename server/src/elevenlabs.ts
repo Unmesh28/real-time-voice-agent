@@ -12,7 +12,7 @@ export async function openTtsStream(apiKey: string, voiceId?: string) {
   });
   return await new Promise<WebSocket>((resolve, reject) => {
     ws.on("open", () => {
-      logger.info({ at: "tts.open", voice }, "Connected to ElevenLabs TTS");
+      logger.info({ at: "tts.open", voice, model }, "Connected to ElevenLabs TTS");
       resolve(ws);
     });
     ws.on("error", (err) => {

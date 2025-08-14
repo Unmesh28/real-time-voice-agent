@@ -75,6 +75,14 @@ npm i
 npm run dev
 ```
 
+### Diagnostics
+- GET http://localhost:8080/about to verify:
+  - tts_model should be eleven_multilingual_v2
+  - default_voice_effective should be 1Z7Y8o9cvUeWq8oLKgMY unless you override ELEVENLABS_VOICE_ID
+  - instructions_sha1 changes only when the Interview instructions change
+- GET http://localhost:8080/session to inspect the OpenAI Realtime session JSON; it should include the full Hindi “Shreya” interviewer prompt in instructions.
+
+
 6) Open the app at the printed Vite URL (default http://localhost:5173).
 - Click "Connect". If a microphone is available, grant access and speak.
 - If a microphone is not available, use the text input to send prompts.

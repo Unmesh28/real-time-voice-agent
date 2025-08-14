@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket as Ws } from "ws";
 import type { RawData } from "ws";
 import { createServer } from "http";
 import fetch from "node-fetch";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { logger } from "./logger";
 import { openTtsStream } from "./elevenlabs";
 import type { TtsRequest, TtsServerMessage } from "./types";
@@ -20,27 +20,7 @@ if (!ELEVENLABS_API_KEY) logger.warn("ELEVENLABS_API_KEY missing");
 
 const app = express();
 app.use(cors({ origin: CLIENT_URL }));
-app.use(express.json());
-
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
-
-app.get("/session", async (_req, res) => {
-  try {
-    const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "realtime=v1",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-realtime-preview-2025-06-03",
-        voice: "verse",
-        turn_detection: { type: "server_vad" },
-        input_audio_format: "pcm16",
-        input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
-        modalities: ["text", "audio"],
-        instructions: `Speak everything in Hindi and don't time-pass on saying repet back, i want to complete call within 3 mins. 
+const INTERVIEW_INSTRUCTIONS = `Speak everything in Hindi and don't time-pass on saying repet back, i want to complete call within 3 mins. 
 
 # Personality
 
@@ -107,7 +87,39 @@ Speak strictly in Hindi throughout the call.
 
 # Tools
 
-None`,
+None`;
+app.use(express.json());
+
+app.get("/healthz", (_req, res) => res.json({ ok: true }));
+app.get("/about", (_req, res) => {
+  const hash = createHash("sha1").update(INTERVIEW_INSTRUCTIONS).digest("hex").slice(0, 12);
+  res.json({
+    model: "gpt-4o-realtime-preview-2025-06-03",
+    tts_model: "eleven_multilingual_v2",
+    default_voice_env: process.env.ELEVENLABS_VOICE_ID || null,
+    default_voice_effective: process.env.ELEVENLABS_VOICE_ID || "1Z7Y8o9cvUeWq8oLKgMY",
+    client_url: CLIENT_URL,
+    instructions_sha1: hash,
+  });
+});
+
+app.get("/session", async (_req, res) => {
+  try {
+    const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+        "OpenAI-Beta": "realtime=v1",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-realtime-preview-2025-06-03",
+        voice: "verse",
+        turn_detection: { type: "server_vad" },
+        input_audio_format: "pcm16",
+        input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
+        modalities: ["text", "audio"],
+        instructions: INTERVIEW_INSTRUCTIONS,
       }),
     });
     const data = await r.json();
