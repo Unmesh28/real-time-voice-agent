@@ -190,7 +190,7 @@ export default function App() {
     const tick = () => {
       analyser.getByteFrequencyData(data);
       const avg = data.reduce((a, b) => a + b, 0) / data.length;
-      const isSpeaking = avg > 8;
+      const isSpeaking = avg > 12;
       if (isSpeaking && !speakingLocal) {
         speakingLocal = true;
         setSpeaking(true);
