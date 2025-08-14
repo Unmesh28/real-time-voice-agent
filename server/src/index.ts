@@ -114,11 +114,10 @@ app.get("/session", async (_req, res) => {
       },
       body: JSON.stringify({
         model: "gpt-4o-realtime-preview-2025-06-03",
-        voice: "verse",
         turn_detection: { type: "server_vad" },
         input_audio_format: "pcm16",
         input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
-        modalities: ["text", "audio"],
+        modalities: ["text"],
         instructions: INTERVIEW_INSTRUCTIONS,
       }),
     });
@@ -202,17 +201,25 @@ wssTts.on("connection", async (clientWs) => {
   clientWs.on("message", async (raw: RawData) => {
     try {
       const data = JSON.parse(raw.toString()) as TtsRequest;
+      logger.info({ at: "tts.client_msg", type: data.type, len: (data as any).text?.length, voiceId: (data as any).voiceId }, "TTS client message");
       if (data.type === "speak") {
         await openStream(data.voiceId || currentVoice);
-        logger.info({ at: "tts.send.init" }, "Sending initial config to ElevenLabs");
-        ttsWs?.send(JSON.stringify({
-          text: " ",
-          voice_settings: { stability: 0.5, similarity_boost: 0.8, use_speaker_boost: false },
-          generation_config: { chunk_length_schedule: [120, 160, 250, 290] }
-        }));
-        logger.info({ at: "tts.send.text", len: data.text.length }, "Sending speak text");
-        ttsWs?.send(JSON.stringify({ text: data.text }));
-        ttsWs?.send(JSON.stringify({ flush: true }));
+        try {
+          logger.info({ at: "tts.send.init" }, "Sending initial config to ElevenLabs");
+          ttsWs?.send(JSON.stringify({
+            text: " ",
+            voice_settings: { stability: 0.5, similarity_boost: 0.8, use_speaker_boost: false },
+            generation_config: { chunk_length_schedule: [120, 160, 250, 290] }
+          }));
+          logger.info({ at: "tts.send.text", len: data.text.length }, "Sending speak text");
+          ttsWs?.send(JSON.stringify({ text: data.text }));
+          ttsWs?.send(JSON.stringify({ flush: true }));
+        } catch (e) {
+          logger.error({ at: "tts.send.error", e }, "Failed sending to ElevenLabs");
+          try {
+            clientWs.send(JSON.stringify({ type: "error", error: "tts_send_failed" } as TtsServerMessage));
+          } catch {}
+        }
       } else if (data.type === "cancel") {
         if (ttsWs && ttsWs.readyState === ttsWs.OPEN) {
           try {

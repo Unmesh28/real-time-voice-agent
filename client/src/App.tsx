@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createAudioPipelines } from "./lib/audio";
+import { PROACTIVE_GREETING_HI } from "./prompt";
 
 const SERVER_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:8080";
-
+const ELEVEN_VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || "1Z7Y8o9cvUeWq8oLKgMY";
 type Log = { ts: number; level: "info" | "error"; msg: string; data?: any };
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
   const ttsWsRef = useRef<WebSocket | null>(null);
   const audioRef = useRef<Awaited<ReturnType<typeof createAudioPipelines>> | null>(null);
   const textBufferRef = useRef<string>("");
+  const ttsQueueRef = useRef<string[]>([]);
 
   const log = (l: Omit<Log, "ts">) => setLogs((s) => [...s, { ...l, ts: Date.now() }]);
 
@@ -29,6 +31,10 @@ export default function App() {
   async function connect() {
     try {
       if (!audioRef.current) audioRef.current = await createAudioPipelines();
+      if (audioRef.current?.ctx.state !== "running") {
+        await audioRef.current?.ctx.resume();
+        log({ level: "info", msg: "audio_context_resumed" });
+      }
 
       const tokenRes = await fetch(`${SERVER_BASE}/session`);
       const data = await tokenRes.json();
@@ -37,12 +43,6 @@ export default function App() {
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
 
-      const audioEl = new Audio();
-      audioEl.autoplay = true;
-      audioElRef.current = audioEl;
-      pc.ontrack = (e) => {
-        audioEl.srcObject = e.streams[0];
-      };
 
       let stream: MediaStream | null = null;
       try {
@@ -52,6 +52,15 @@ export default function App() {
       } catch (err) {
         setNoMic(true);
         log({ level: "error", msg: "mic_unavailable", data: String(err) });
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const dest = ctx.createMediaStreamDestination();
+          const silentTrack = dest.stream.getAudioTracks()[0];
+          pc.addTrack(silentTrack);
+          log({ level: "info", msg: "added_silent_track_for_webrtc" });
+        } catch (e) {
+          log({ level: "error", msg: "silent_track_failed", data: String(e) });
+        }
       }
 
       pc.ondatachannel = (event) => {
@@ -64,8 +73,7 @@ export default function App() {
                 type: "response.create",
                 response: {
                   modalities: ["text"],
-                  instructions:
-                    "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+                  instructions: PROACTIVE_GREETING_HI,
                 },
               };
               event.channel.send(JSON.stringify(proactive));
@@ -88,8 +96,7 @@ export default function App() {
             type: "response.create",
             response: {
               modalities: ["text"],
-              instructions:
-                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+              instructions: PROACTIVE_GREETING_HI,
             },
           };
           eventsDc.send(JSON.stringify(proactive));
@@ -104,8 +111,7 @@ export default function App() {
             type: "response.create",
             response: {
               modalities: ["text"],
-              instructions:
-                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+              instructions: PROACTIVE_GREETING_HI,
             },
           };
           const ch = dcRef.current && dcRef.current.readyState === "open" ? dcRef.current : eventsDc;
@@ -121,19 +127,45 @@ export default function App() {
       const ttsWs = new WebSocket(SERVER_BASE.replace("http", "ws") + "/ws/tts");
       ttsWsRef.current = ttsWs;
       ttsWs.binaryType = "arraybuffer";
-      ttsWs.onopen = () => setTtsOpen(true);
-      ttsWs.onclose = () => setTtsOpen(false);
-      ttsWs.onmessage = (e) => {
-        if (typeof e.data !== "string" && e.data instanceof ArrayBuffer) {
-          audioRef.current?.pushPcm16(e.data);
+      ttsWs.onopen = () => {
+        setTtsOpen(true);
+        try {
+          while (ttsQueueRef.current.length) {
+            const next = ttsQueueRef.current.shift()!;
+            ttsWs.send(JSON.stringify({ type: "speak", text: next, voiceId: ELEVEN_VOICE_ID }));
+            log({ level: "info", msg: "tts_speak_sent_from_queue", data: next.slice(0, 60) });
+          }
+          ttsWs.send(JSON.stringify({ type: "speak", text: PROACTIVE_GREETING_HI, voiceId: ELEVEN_VOICE_ID }));
+          log({ level: "info", msg: "tts_proactive_sent" });
+        } catch (e) {
+          log({ level: "error", msg: "tts_proactive_error", data: String(e) });
         }
       };
+      ttsWs.onerror = (ev) => {
+        log({ level: "error", msg: "tts_ws_error", data: String(ev) });
+      };
+      ttsWs.onclose = () => {
+        setTtsOpen(false);
+        log({ level: "error", msg: "tts_ws_closed" });
+      };
+      ttsWs.onmessage = (e) => {
+        if (typeof e.data !== "string" && e.data instanceof ArrayBuffer) {
+          log({ level: "info", msg: "tts_chunk_recv", data: (e.data.byteLength || 0) });
+          audioRef.current?.pushPcm16(e.data);
+          return;
+        }
+        try {
+          const msg = JSON.parse(e.data as string);
+          if (msg.type === "eof") {
+            audioRef.current?.clearPlayer();
+          }
+        } catch {}
+      };
 
-      if (!stream) {
-        pc.addTransceiver("audio", { direction: "recvonly" });
-        log({ level: "info", msg: "added_recvonly_audio_transceiver" });
-      } else {
+      if (stream) {
         log({ level: "info", msg: "mic_track_added_to_openai" });
+      } else {
+        log({ level: "info", msg: "no_mic_no_remote_audio" });
       }
 
       const offer = await pc.createOffer();
@@ -209,8 +241,14 @@ export default function App() {
       } else if (msg.type === "response.completed" || msg.type === "response.done") {
         const text = textBufferRef.current.trim();
         textBufferRef.current = "";
-        if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
-          ttsWsRef.current.send(JSON.stringify({ type: "speak", text }));
+        if (text) {
+          if (ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
+            ttsWsRef.current.send(JSON.stringify({ type: "speak", text, voiceId: ELEVEN_VOICE_ID }));
+            log({ level: "info", msg: "tts_speak_sent", data: text.slice(0, 60) });
+          } else {
+            ttsQueueRef.current.push(text);
+            log({ level: "info", msg: "tts_queue_deferred", data: text.slice(0, 60) });
+          }
         }
       }
       log({ level: "info", msg: "oai", data: msg.type });
