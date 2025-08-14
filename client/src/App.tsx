@@ -139,7 +139,6 @@ export default function App() {
               setAgentSpeaking(false);
             }
           } else if (e.data instanceof ArrayBuffer) {
-            if (!agentSpeaking) setAgentSpeaking(true);
             audioRef.current?.pushPcm16(e.data);
           }
         } catch {}
@@ -233,6 +232,7 @@ export default function App() {
         const text = textBufferRef.current.trim();
         textBufferRef.current = "";
         if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
+          setAgentSpeaking(true);
           ttsWsRef.current.send(JSON.stringify({ type: "speak", text }));
         }
       }
