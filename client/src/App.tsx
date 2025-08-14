@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createAudioPipelines } from "./lib/audio";
+import { PROACTIVE_GREETING_HI } from "./prompt";
 
 const SERVER_BASE = import.meta.env.VITE_SERVER_URL || "http://localhost:8080";
-
+const ELEVEN_VOICE_ID = import.meta.env.VITE_ELEVENLABS_VOICE_ID || "1Z7Y8o9cvUeWq8oLKgMY";
 type Log = { ts: number; level: "info" | "error"; msg: string; data?: any };
 
 export default function App() {
@@ -64,8 +65,7 @@ export default function App() {
                 type: "response.create",
                 response: {
                   modalities: ["text"],
-                  instructions:
-                    "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+                  instructions: PROACTIVE_GREETING_HI,
                 },
               };
               event.channel.send(JSON.stringify(proactive));
@@ -88,8 +88,7 @@ export default function App() {
             type: "response.create",
             response: {
               modalities: ["text"],
-              instructions:
-                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+              instructions: PROACTIVE_GREETING_HI,
             },
           };
           eventsDc.send(JSON.stringify(proactive));
@@ -104,8 +103,7 @@ export default function App() {
             type: "response.create",
             response: {
               modalities: ["text"],
-              instructions:
-                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+              instructions: PROACTIVE_GREETING_HI,
             },
           };
           const ch = dcRef.current && dcRef.current.readyState === "open" ? dcRef.current : eventsDc;
@@ -121,7 +119,14 @@ export default function App() {
       const ttsWs = new WebSocket(SERVER_BASE.replace("http", "ws") + "/ws/tts");
       ttsWsRef.current = ttsWs;
       ttsWs.binaryType = "arraybuffer";
-      ttsWs.onopen = () => setTtsOpen(true);
+      ttsWs.onopen = () => {
+        setTtsOpen(true);
+        try {
+          ttsWs.send(JSON.stringify({ type: "speak", text: PROACTIVE_GREETING_HI, voiceId: ELEVEN_VOICE_ID }));
+        } catch (e) {
+          log({ level: "error", msg: "tts_proactive_error", data: String(e) });
+        }
+      };
       ttsWs.onclose = () => setTtsOpen(false);
       ttsWs.onmessage = (e) => {
         if (typeof e.data !== "string" && e.data instanceof ArrayBuffer) {
