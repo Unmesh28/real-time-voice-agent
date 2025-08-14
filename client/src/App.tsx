@@ -38,12 +38,6 @@ export default function App() {
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
 
-      const audioEl = new Audio();
-      audioEl.autoplay = true;
-      audioElRef.current = audioEl;
-      pc.ontrack = (e) => {
-        audioEl.srcObject = e.streams[0];
-      };
 
       let stream: MediaStream | null = null;
       try {
@@ -134,11 +128,10 @@ export default function App() {
         }
       };
 
-      if (!stream) {
-        pc.addTransceiver("audio", { direction: "recvonly" });
-        log({ level: "info", msg: "added_recvonly_audio_transceiver" });
-      } else {
+      if (stream) {
         log({ level: "info", msg: "mic_track_added_to_openai" });
+      } else {
+        log({ level: "info", msg: "no_mic_no_remote_audio" });
       }
 
       const offer = await pc.createOffer();
