@@ -58,9 +58,46 @@ export default function App() {
         if (event.channel.label === "oai-events") {
           dcRef.current = event.channel;
           event.channel.onmessage = (e) => handleOaiEvent(e);
+          event.channel.onopen = () => {
+            try {
+              const proactive = {
+                type: "response.create",
+                response: {
+                  modalities: ["text"],
+                  instructions:
+                    "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+                },
+              };
+              event.channel.send(JSON.stringify(proactive));
+              log({ level: "info", msg: "proactive_start_sent" });
+            } catch (e) {
+              log({ level: "error", msg: "proactive_start_error", data: String(e) });
+            }
+          };
         }
       };
 
+
+      const eventsDc = pc.createDataChannel("oai-events");
+      dcRef.current = eventsDc;
+      eventsDc.onmessage = (e) => handleOaiEvent(e);
+      eventsDc.onopen = () => {
+        log({ level: "info", msg: "events_dc_open" });
+        try {
+          const proactive = {
+            type: "response.create",
+            response: {
+              modalities: ["text"],
+              instructions:
+                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
+            },
+          };
+          eventsDc.send(JSON.stringify(proactive));
+          log({ level: "info", msg: "proactive_start_sent" });
+        } catch (e) {
+          log({ level: "error", msg: "proactive_start_error", data: String(e) });
+        }
+      };
 
       const ttsWs = new WebSocket(SERVER_BASE.replace("http", "ws") + "/ws/tts");
       ttsWsRef.current = ttsWs;
@@ -73,25 +110,6 @@ export default function App() {
         }
       };
 
-      const eventsDc = pc.createDataChannel("oai-events");
-      dcRef.current = eventsDc;
-      eventsDc.onmessage = (e) => handleOaiEvent(e);
-      eventsDc.onopen = () => {
-        try {
-          const proactive = {
-            type: "response.create",
-            response: {
-              modalities: ["audio", "text"],
-              instructions:
-                "नमस्ते! मैं श्रेया बोल रही हूँ, टैलेंट हब से। क्या अभी 3 मिनट बात करना ठीक रहेगा? पूरी बातचीत हिंदी में होगी।",
-            },
-          };
-          eventsDc.send(JSON.stringify(proactive));
-          log({ level: "info", msg: "proactive_start_sent" });
-        } catch (e) {
-          log({ level: "error", msg: "proactive_start_error", data: String(e) });
-        }
-      };
       if (!stream) {
         pc.addTransceiver("audio", { direction: "recvonly" });
         log({ level: "info", msg: "added_recvonly_audio_transceiver" });
