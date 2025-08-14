@@ -175,7 +175,8 @@ export default function App() {
       await pc.setRemoteDescription(answer);
 
       if (stream) {
-        setupBargeIn(stream);
+        // setupBargeIn(stream); // Temporarily disable barge-in to fix audio issues
+        log({ level: "info", msg: "barge_in_disabled" });
       } else {
         log({ level: "info", msg: "using_text_fallback" });
       }
@@ -232,6 +233,7 @@ export default function App() {
         const text = textBufferRef.current.trim();
         textBufferRef.current = "";
         if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
+          console.log("Sending to TTS:", text);
           setAgentSpeaking(true);
           ttsWsRef.current.send(JSON.stringify({ type: "speak", text }));
         }
