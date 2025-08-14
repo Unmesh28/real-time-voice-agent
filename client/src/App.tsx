@@ -31,7 +31,14 @@ export default function App() {
       if (!audioRef.current) audioRef.current = await createAudioPipelines();
 
       const tokenRes = await fetch(`${SERVER_BASE}/session`);
+      if (!tokenRes.ok) {
+        const errorData = await tokenRes.json().catch(() => ({ error: "unknown", message: "Failed to parse error response" }));
+        throw new Error(`Failed to get session: ${JSON.stringify(errorData)}`);
+      }
       const data = await tokenRes.json();
+      if (!data.client_secret || !data.client_secret.value) {
+        throw new Error("Invalid session data: client_secret missing");
+      }
       const EPHEMERAL_KEY = data.client_secret.value;
 
       const pc = new RTCPeerConnection();
@@ -40,9 +47,9 @@ export default function App() {
       const audioEl = new Audio();
       audioEl.autoplay = true;
       audioElRef.current = audioEl;
-      pc.ontrack = (e) => {
-        audioEl.srcObject = e.streams[0];
-      };
+      // pc.ontrack = (e) => {
+      //   audioEl.srcObject = e.streams[0];
+      // };
 
       let stream: MediaStream | null = null;
       try {
