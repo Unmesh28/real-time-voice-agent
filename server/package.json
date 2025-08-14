@@ -8,8 +8,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:session": "tsx scripts/test-session.ts",
-    "test:tts": "tsx scripts/test-tts.ts",
-    "test:stt": "tsx scripts/test-stt.ts"
+    "test:tts": "tsx scripts/test-tts.ts"
   },
   "keywords": [],
   "author": "",

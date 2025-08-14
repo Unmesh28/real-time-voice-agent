@@ -10,8 +10,7 @@ Voice agent that uses:
 ## Architecture
 
 Browser (React)
-- Mic capture with WebAudio
-- Downsample to 16k PCM16 via AudioWorklet, stream to `/ws/stt`
+- Mic capture with WebAudio; adds mic audio track to WebRTC PeerConnection
 - Connects to OpenAI Realtime over WebRTC using ephemeral token from server (`/session`)
 - Receives LLM events over data channel; on `response.completed` streams text to `/ws/tts`
 - AudioWorklet player consumes streamed PCM16 from server and plays it
@@ -84,9 +83,6 @@ npm run test:session
 
 # Validate ElevenLabs TTS streaming bridge (saves /home/ubuntu/tmp/tts_test.wav)
 npm run test:tts
-
-# Validate ElevenLabs Scribe STT bridge
-npm run test:stt
 ```
 
 ## Logging

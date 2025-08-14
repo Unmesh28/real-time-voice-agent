@@ -34,11 +34,21 @@ async function main() {
   const outChunks: Buffer[] = [];
   const ws = new WebSocket(`${base}/ws/tts`);
   await new Promise<void>((resolve, reject) => {
+    let timer: NodeJS.Timeout | null = null;
+    const arm = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try { ws.close(); } catch {}
+        resolve();
+      }, 5000);
+    };
     ws.on("open", () => {
       console.log("TTS WS open");
       ws.send(JSON.stringify({ type: "speak", text: "Hello, this is a realtime TTS test from ElevenLabs via our bridge.", voiceId: process.env.ELEVEN_VOICE_ID }));
+      arm();
     });
     ws.on("message", (data) => {
+      arm();
       if (Buffer.isBuffer(data)) {
         outChunks.push(data);
       } else {

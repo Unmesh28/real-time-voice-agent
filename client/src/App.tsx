@@ -16,7 +16,6 @@ export default function App() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
-  const sttWsRef = useRef<WebSocket | null>(null);
   const ttsWsRef = useRef<WebSocket | null>(null);
   const audioRef = useRef<Awaited<ReturnType<typeof createAudioPipelines>> | null>(null);
   const textBufferRef = useRef<string>("");
@@ -223,8 +222,7 @@ export default function App() {
         ))}
       </div>
       <p className="text-sm text-gray-600">
-        Speak to the mic; partial/final transcripts are sent to the LLM. When the LLM completes a message, it is spoken with ElevenLabs. If you start
-        speaking, TTS will cancel immediately (barge-in).
+        Speak to the mic; OpenAI Realtime transcribes in-stream and generates responses. When the LLM completes a message, it is spoken with ElevenLabs. If you start speaking, TTS will cancel immediately (barge-in).
       </p>
     </div>
   );

@@ -6,9 +6,9 @@ import type { RawData } from "ws";
 import { createServer } from "http";
 import fetch from "node-fetch";
 import { randomUUID } from "crypto";
-import { logger } from "./logger.js";
-import { openScribeStream, openTtsStream } from "./elevenlabs.js";
-import type { SttServerMessage, TtsRequest, TtsServerMessage } from "./types.js";
+import { logger } from "./logger";
+import { openTtsStream } from "./elevenlabs";
+import type { TtsRequest, TtsServerMessage } from "./types";
 
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
@@ -57,75 +57,17 @@ app.get("/session", async (_req, res) => {
 
 const server = createServer(app);
 
-const wssStt = new WebSocketServer({ noServer: true });
 const wssTts = new WebSocketServer({ noServer: true });
 
 server.on("upgrade", (req, socket, head) => {
   const { url } = req;
-  if (url?.startsWith("/ws/stt")) {
-    wssStt.handleUpgrade(req, socket, head, (ws) => wssStt.emit("connection", ws, req));
-  } else if (url?.startsWith("/ws/tts")) {
+  if (url?.startsWith("/ws/tts")) {
     wssTts.handleUpgrade(req, socket, head, (ws) => wssTts.emit("connection", ws, req));
   } else {
     socket.destroy();
   }
 });
 
-wssStt.on("connection", async (clientWs) => {
-  const sessionId = randomUUID();
-  logger.info({ sessionId }, "Client connected to STT");
-
-  let scribeWs: Ws | null = null;
-
-  try {
-    scribeWs = (await openScribeStream(ELEVENLABS_API_KEY)) as unknown as Ws;
-
-    scribeWs.on("message", (data: RawData) => {
-      try {
-        const msg = JSON.parse(data.toString());
-        if (msg.type === "partial") {
-          const out: SttServerMessage = { type: "partial", text: msg.text || "" };
-          clientWs.send(JSON.stringify(out));
-        } else if (msg.type === "final") {
-          const out: SttServerMessage = { type: "final", text: msg.text || "" };
-          clientWs.send(JSON.stringify(out));
-        }
-      } catch (e) {
-        logger.warn({ e }, "Failed to parse Scribe message");
-      }
-    });
-
-    scribeWs.on("close", () => {
-      logger.info({ sessionId }, "Scribe closed");
-      if (clientWs.readyState === clientWs.OPEN) clientWs.close();
-    });
-  } catch (err) {
-    logger.error({ err }, "Failed to open Scribe stream");
-    clientWs.send(JSON.stringify({ type: "error", error: "scribe_open_failed" } as SttServerMessage));
-    clientWs.close();
-    return;
-  }
-
-  clientWs.on("message", (raw: RawData) => {
-    try {
-      const parsed: any = JSON.parse(raw.toString());
-      if (parsed && parsed.type === "stop") {
-        scribeWs?.send(JSON.stringify({ type: "stop" }));
-        return;
-      }
-      if (parsed && parsed.type === "ping") return;
-    } catch {
-      if (scribeWs && scribeWs.readyState === scribeWs.OPEN) {
-        scribeWs.send(raw);
-      }
-    }
-  });
-
-  clientWs.on("close", () => {
-    logger.info({ sessionId }, "STT client closed");
-    if (scribeWs && scribeWs.readyState === scribeWs.OPEN) scribeWs.close();
-  });
-});
 
 wssTts.on("connection", async (clientWs) => {
   const sessionId = randomUUID();
