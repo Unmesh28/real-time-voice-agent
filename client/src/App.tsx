@@ -126,6 +126,7 @@ export default function App() {
         setTtsOpen(true);
         try {
           ttsWs.send(JSON.stringify({ type: "speak", text: PROACTIVE_GREETING_HI, voiceId: ELEVEN_VOICE_ID }));
+          log({ level: "info", msg: "tts_proactive_sent" });
         } catch (e) {
           log({ level: "error", msg: "tts_proactive_error", data: String(e) });
         }
@@ -218,6 +219,7 @@ export default function App() {
         textBufferRef.current = "";
         if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
           ttsWsRef.current.send(JSON.stringify({ type: "speak", text }));
+          log({ level: "info", msg: "tts_speak_sent", data: text.slice(0, 60) });
         }
       }
       log({ level: "info", msg: "oai", data: msg.type });
