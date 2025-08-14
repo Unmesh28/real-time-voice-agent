@@ -205,7 +205,7 @@ export default function App() {
       } else {
         analyser.getByteFrequencyData(data);
         const avg = data.reduce((a, b) => a + b, 0) / data.length;
-        const isSpeaking = avg > 12;
+        const isSpeaking = avg > 20;
         if (isSpeaking && !speakingLocal) {
           speakingLocal = true;
           setSpeaking(true);
@@ -227,9 +227,9 @@ export default function App() {
   function handleOaiEvent(e: MessageEvent) {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === "response.audio_transcript.delta" && msg.delta) {
+      if ((msg.type === "response.audio_transcript.delta" || msg.type === "response.text.delta") && msg.delta) {
         textBufferRef.current += msg.delta;
-      } else if (msg.type === "response.audio_transcript.done") {
+      } else if (msg.type === "response.audio_transcript.done" || msg.type === "response.text.done") {
         const text = textBufferRef.current.trim();
         textBufferRef.current = "";
         if (text && ttsWsRef.current && ttsWsRef.current.readyState === WebSocket.OPEN) {
