@@ -47,6 +47,15 @@ export default function App() {
       } catch (err) {
         setNoMic(true);
         log({ level: "error", msg: "mic_unavailable", data: String(err) });
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const dest = ctx.createMediaStreamDestination();
+          const silentTrack = dest.stream.getAudioTracks()[0];
+          pc.addTrack(silentTrack);
+          log({ level: "info", msg: "added_silent_track_for_webrtc" });
+        } catch (e) {
+          log({ level: "error", msg: "silent_track_failed", data: String(e) });
+        }
       }
 
       pc.ondatachannel = (event) => {
